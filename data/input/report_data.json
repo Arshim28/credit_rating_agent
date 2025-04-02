@@ -1,0 +1,59 @@
+{
+  "companies": [
+    {
+      "name": "SFC Environmental Technologies Limited",
+      "reports": [
+        {
+          "agency": "CARE",
+          "date": "2024-04-02",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20240402_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2023-04-27",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20230427_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2023-03-31",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20230331_2.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2022-04-06",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20220406_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2021-04-07",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20210407_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2020-04-06",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20200406_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2019-02-27",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20190227_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2018-04-03",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20180403_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2017-04-28",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20170428_1.pdf"
+        },
+        {
+          "agency": "CARE",
+          "date": "2016-04-21",
+          "file_path": "rating_reports/SFC_Environmental_Technologies_Limited/CARE_20160421_1.pdf"
+        }
+      ]
+    }
+  ]
+}
