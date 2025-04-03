@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from utils import logger
+from src.rag_components.utils import logger
 
 class TextChunk:
 	def __init__(self, text: str, metadata: Dict[str, Any]):

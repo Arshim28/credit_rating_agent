@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Tuple
 from mistralai import Mistral
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from config import MISTRAL_API_KEY
+from src.rag_components.config import MISTRAL_API_KEY
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

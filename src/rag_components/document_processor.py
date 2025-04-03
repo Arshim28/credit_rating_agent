@@ -2,11 +2,11 @@ import os
 import gc
 import numpy as np
 from typing import List
-from ocr_processor import OCR
-from text_chunk import TextChunk
-from embedding import GeminiEmbeddingProvider
-from utils import log_memory_usage, log_array_info, logger, chunk_generator
-from config import DEFAULT_CONFIG, GOOGLE_API_KEY, MISTRAL_API_KEY
+from src.rag_components.ocr_processor import OCR
+from src.rag_components.text_chunk import TextChunk
+from src.rag_components.embedding import GeminiEmbeddingProvider
+from src.rag_components.utils import log_memory_usage, log_array_info, logger, chunk_generator
+from src.rag_components.config import DEFAULT_CONFIG, GOOGLE_API_KEY, MISTRAL_API_KEY
 
 
 class DocumentProcessor:
