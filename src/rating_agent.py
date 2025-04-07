@@ -27,6 +27,7 @@ class TrendAnalysisState(MessagesState):
     extracted_ratings: List[Dict[str, Any]]
     company_name: str
     report_manager: VectorStoreManager
+    yearly_ratings_json: Dict[int, Dict[str, Any]]
     trend_analysis: Optional[Dict[str, Any]] = None
 
 
@@ -142,6 +143,92 @@ class RatingTrendAnalyzer:
         
         self.logger.warning(f"ALL ANALYSES SAVED to {self.output_file}")
         log_memory_usage("program_end")
+        
+    def _extract_yearly_ratings(self, reports_data: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+        yearly_ratings = {}
+        
+        reports_data.sort(key=lambda x: x["date"])
+        
+        for report in reports_data:
+            report_date = report["date"]
+            report_path = report["file_path"]
+            
+            try:
+                report_year = datetime.strptime(report_date, "%Y-%m-%d").year
+                
+                vector_store = self.report_manager.get_store(report_path)
+                
+                if not vector_store:
+                    self.logger.error(f"Vector store not found for {report_path}")
+                    continue
+                
+                ratings_info = self._query_report_for_ratings(vector_store)
+                
+                long_term_rating = None
+                short_term_rating = None
+                outlook = None
+                
+                for query, results in ratings_info.items():
+                    for result in results:
+                        if not long_term_rating:
+                            long_term_match = re.search(r'CARE\s+([A-D][+-]?)', result) or \
+                                             re.search(r'([A-D][+-]?)\s+\(Long[- ]Term\)', result) or \
+                                             re.search(r'Long[- ]Term\s+Rating\s*:?\s*([A-D][+-]?)', result) or \
+                                             re.search(r'Long[- ]Term\s*:?\s*([A-D][+-]?)', result)
+                            if long_term_match:
+                                long_term_rating = long_term_match.group(1).upper()
+                        
+                        if not short_term_rating:
+                            short_term_match = re.search(r'CARE\s+(A[1-4][+-]?|B[1]?|C|D)', result) or \
+                                              re.search(r'(A[1-4][+-]?|B[1]?|C|D)\s+\(Short[- ]Term\)', result) or \
+                                              re.search(r'Short[- ]Term\s+Rating\s*:?\s*(A[1-4][+-]?|B[1]?|C|D)', result) or \
+                                              re.search(r'Short[- ]Term\s*:?\s*(A[1-4][+-]?|B[1]?|C|D)', result)
+                            if short_term_match:
+                                short_term_rating = short_term_match.group(1).upper()
+                        
+                        if not outlook:
+                            outlook_match = re.search(r'Outlook\s*:?\s*(Positive|Stable|Negative)', result) or \
+                                           re.search(r'Rating\s+Outlook\s*:?\s*(Positive|Stable|Negative)', result) or \
+                                           re.search(r'with\s+(Positive|Stable|Negative)\s+outlook', result) or \
+                                           re.search(r'outlook\s+is\s+(Positive|Stable|Negative)', result)
+                            if outlook_match:
+                                outlook = outlook_match.group(1).title()
+                
+                yearly_ratings[report_year] = {
+                    "long_term": long_term_rating,
+                    "short_term": short_term_rating,
+                    "outlook": outlook,
+                    "report_date": report_date
+                }
+                
+                self.logger.info(f"Extracted ratings for year {report_year}: LT={long_term_rating}, ST={short_term_rating}, Outlook={outlook}")
+                
+            except Exception as e:
+                self.logger.error(f"Error processing report {report_path}: {str(e)}")
+        
+        if yearly_ratings:
+            min_year = min(yearly_ratings.keys())
+            max_year = max(yearly_ratings.keys())
+            
+            for year in range(min_year, max_year + 1):
+                if year not in yearly_ratings:
+                    prev_year = None
+                    for y in sorted(yearly_ratings.keys()):
+                        if y < year:
+                            prev_year = y
+                    
+                    next_year = None
+                    for y in sorted(yearly_ratings.keys()):
+                        if y > year:
+                            next_year = y
+                            break
+                    
+                    if prev_year:
+                        yearly_ratings[year] = yearly_ratings[prev_year].copy()
+                        yearly_ratings[year]["estimated"] = True
+                        yearly_ratings[year]["report_date"] = f"{year}-01-01"
+        
+        return yearly_ratings
         
     def _extract_ratings_data(self, analysis):
         dates = []
@@ -301,46 +388,40 @@ class RatingTrendAnalyzer:
         }
     
     def _generate_rating_table(self, analyses):
-        """Generate a simple HTML table showing year and rating with color coding"""
-        
         table_html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>\n"
         table_html += "<tr><th>Year</th><th>Company</th><th>Long-Term Rating</th><th>Short-Term Rating</th><th>Outlook</th></tr>\n"
         
         table_rows = []
         
         for analysis in analyses:
-            data = self._extract_ratings_data(analysis)
-            
-            if not data["dates"]:
-                continue
+            if "yearly_ratings_json" in analysis:
+                company_name = analysis["company_name"]
+                yearly_ratings = analysis["yearly_ratings_json"]
                 
-            company = data["company"]
-            
-            for i, date in enumerate(data["dates"]):
-                year = date.year
-                lt_rating = data["long_term_ratings"][i] if i < len(data["long_term_ratings"]) else ""
-                st_rating = data["short_term_ratings"][i] if i < len(data["short_term_ratings"]) else ""
-                outlook = data["outlooks"][i] if i < len(data["outlooks"]) else "Unknown"
-                
-                # Set color based on outlook
-                color = "green" if outlook == "Stable" else "red"
-                
-                row = {
-                    "year": year,
-                    "company": company,
-                    "lt_rating": lt_rating,
-                    "st_rating": st_rating,
-                    "outlook": outlook,
-                    "color": color
-                }
-                
-                table_rows.append(row)
+                for year, ratings in yearly_ratings.items():
+                    lt_rating = ratings.get("long_term", "")
+                    st_rating = ratings.get("short_term", "")
+                    outlook = ratings.get("outlook", "Unknown")
+                    estimated = ratings.get("estimated", False)
+                    
+                    color = "green" if outlook == "Stable" else "red"
+                    if estimated:
+                        color = "gray"
+                    
+                    row = {
+                        "year": year,
+                        "company": company_name,
+                        "lt_rating": lt_rating,
+                        "st_rating": st_rating,
+                        "outlook": outlook,
+                        "color": color
+                    }
+                    
+                    table_rows.append(row)
         
-        # If no data was extracted, provide sample data
         if not table_rows:
             self.logger.warning("No rating data found, using sample data for table")
             
-            # From the PDF, we know SFC maintained A-/A1 ratings with a period of Positive outlook
             sample_data = [
                 {"year": 2016, "company": "SFC Environmental", "lt_rating": "A-", "st_rating": "A1", "outlook": "Stable", "color": "green"},
                 {"year": 2017, "company": "SFC Environmental", "lt_rating": "A-", "st_rating": "A1", "outlook": "Positive", "color": "red"},
@@ -350,10 +431,8 @@ class RatingTrendAnalyzer:
             
             table_rows = sample_data
         
-        # Sort rows by year
-        table_rows.sort(key=lambda x: x["year"])
+        table_rows.sort(key=lambda x: (x["company"], x["year"]))
         
-        # Generate table rows
         for row in table_rows:
             table_html += f"<tr>"
             table_html += f"<td>{row['year']}</td>"
@@ -373,10 +452,21 @@ class RatingTrendAnalyzer:
         markdown += f"## Executive Summary\n\n"
         markdown += f"This report provides rating trend analysis for {len(analyses)} companies.\n\n"
         
-        # Add rating table
         markdown += f"### Rating Trends\n\n"
         rating_table = self._generate_rating_table(analyses)
         markdown += rating_table + "\n\n"
+        
+        all_ratings_json = {}
+        for analysis in analyses:
+            if "yearly_ratings_json" in analysis:
+                company_name = analysis["company_name"]
+                yearly_ratings = analysis["yearly_ratings_json"]
+                all_ratings_json[company_name] = yearly_ratings
+        
+        with open(f"{self.output_file.split('.')[0]}_ratings.json", 'w') as f:
+            json.dump(all_ratings_json, f, indent=2)
+        
+        self.logger.info(f"Ratings JSON saved to {self.output_file.split('.')[0]}_ratings.json")
         
         for analysis in analyses:
             markdown += f"## {analysis['company_name']}\n\n"
@@ -405,6 +495,8 @@ class RatingTrendAnalyzer:
             self.report_manager.process_document(report_path)
             gc.collect()
         
+        yearly_ratings_json = self._extract_yearly_ratings(reports_data)
+        
         self.logger.warning("CREATING REFLECTION SYSTEM")
         assistant_graph = self._create_assistant_graph()
         critique_graph = self._create_critique_graph()
@@ -418,6 +510,7 @@ class RatingTrendAnalyzer:
             "extracted_ratings": [],
             "company_name": company_name,
             "report_manager": self.report_manager,
+            "yearly_ratings_json": yearly_ratings_json
         }
         
         self.logger.warning(f"STARTING ANALYSIS for {company_name}")
@@ -431,6 +524,7 @@ class RatingTrendAnalyzer:
             log_memory_usage("after_gc_reflection_run")
             
             if result and "trend_analysis" in result and result["trend_analysis"]:
+                result["trend_analysis"]["yearly_ratings_json"] = yearly_ratings_json
                 return result["trend_analysis"]
         except Exception as e:
             self.logger.error(f"ERROR during analysis for {company_name}: {str(e)}")
